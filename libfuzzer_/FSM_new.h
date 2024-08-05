@@ -6,7 +6,8 @@
 
 class State {
 public:
-    std::vector<int> state;
+    std::vector<int> state;   // more than 1 state variable (sv)
+    int id;
 
     State(std::initializer_list<int> init) : state(init) {}
 
@@ -57,6 +58,8 @@ public:
         }
     }
 };
+
+// TBD: add more test to this FSM
 
 // int main() {
 //     FSM fsm;

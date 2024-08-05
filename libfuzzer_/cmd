@@ -1,0 +1,1 @@
+cp -r /scratch/wjw5351/downloads/llvm-project-llvmorg-13.0.1/compiler-rt/lib/fuzzer/* /scratch/wjw5351/libfuzzer_/libfuzzer_/

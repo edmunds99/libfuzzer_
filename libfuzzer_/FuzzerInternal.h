@@ -103,6 +103,7 @@ private:
   void InterruptCallback();
   void MutateAndTestOne();
 
+  // newly added
   void MutateAndTestOne_FSM();
   int find_sep_pos(const Unit &U);
   void reverse_data(uint8_t* data, size_t size);
@@ -144,6 +145,8 @@ private:
   MutationDispatcher &MD;
   FuzzingOptions Options;
   DataFlowTrace DFT;
+
+  InputCorpus state_corpus[100];
 
   system_clock::time_point ProcessStartTime = system_clock::now();
   system_clock::time_point UnitStartTime, UnitStopTime;
