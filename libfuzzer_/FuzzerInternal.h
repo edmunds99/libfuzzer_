@@ -18,6 +18,7 @@
 #include "FuzzerOptions.h"
 #include "FuzzerSHA1.h"
 #include "FuzzerValueBitMap.h"
+#include "FuzzerCorpus.h"
 #include "FSM_new.h"
 #include <algorithm>
 #include <atomic>

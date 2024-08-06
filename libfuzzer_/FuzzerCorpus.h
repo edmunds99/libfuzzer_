@@ -162,6 +162,7 @@ class InputCorpus {
   EntropicOptions Entropic;
 
 public:
+  InputCorpus() {}
   InputCorpus(const std::string &OutputCorpus, EntropicOptions Entropic)
       : Entropic(Entropic), OutputCorpus(OutputCorpus) {
     memset(InputSizesPerFeature, 0, sizeof(InputSizesPerFeature));
@@ -170,6 +171,10 @@ public:
   ~InputCorpus() {
     for (auto II : Inputs)
       delete II;
+  }
+  void initialize(const std::string &dir, const EntropicOptions &entropicOptions) {
+      this->Entropic=entropicOptions;
+      this->OutputCorpus=dir;
   }
   size_t size() const { return Inputs.size(); }
   size_t SizeInBytes() const {

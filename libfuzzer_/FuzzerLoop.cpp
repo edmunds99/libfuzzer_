@@ -150,6 +150,17 @@ void Fuzzer::HandleMalloc(size_t Size) {
 Fuzzer::Fuzzer(UserCallback CB, InputCorpus &Corpus, MutationDispatcher &MD,
                FuzzingOptions Options)
     : CB(CB), Corpus(Corpus), MD(MD), Options(Options) {
+
+  std::string fake_state_corpus_dir="";
+  struct EntropicOptions fake_entropic;
+  fake_entropic.Enabled = Options.Entropic;
+  fake_entropic.FeatureFrequencyThreshold =
+      Options.EntropicFeatureFrequencyThreshold;
+  fake_entropic.NumberOfRarestFeatures = Options.EntropicNumberOfRarestFeatures;
+  fake_entropic.ScalePerExecTime = Options.EntropicScalePerExecTime;
+  for (int i=0; i<100; i++)
+    state_corpus[i].initialize(fake_state_corpus_dir, fake_entropic);
+    
   if (EF->__sanitizer_set_death_callback)
     EF->__sanitizer_set_death_callback(StaticDeathCallback);
   assert(!F);
@@ -532,6 +543,9 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   TPC.CollectFeatures([&](uint32_t Feature) {
     if (Corpus.AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink))
       UniqFeatureSetTmp.push_back(Feature);
+    state_corpus[cur_state_id].AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink);  
+    // newly added
+    
     if (Options.Entropic) {
       Corpus.UpdateFeatureFrequency(II, Feature);
       state_corpus[cur_state_id].UpdateFeatureFrequency(II, Feature);   // newly added
@@ -556,7 +570,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
                            TPC.ObservedFocusFunction(), ForceAddToCorpus,
                            TimeOfUnit, UniqFeatureSetTmp, DFT, II);      
                            // newly added. add to state_corpus
-                           
+
     WriteFeatureSetToFile(Options.FeaturesDir, Sha1ToString(NewII->Sha1),
                           NewII->UniqFeatureSet);
     WriteEdgeToMutationGraphFile(Options.MutationGraphFile, NewII, II,
@@ -569,6 +583,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
       II->U.size() > Size) {
     auto OldFeaturesFile = Sha1ToString(II->Sha1);
     Corpus.Replace(II, {Data, Data + Size});
+    state_corpus[cur_state_id].Replace(II, {Data, Data + Size});   // newly added
     RenameFeatureSetFile(Options.FeaturesDir, OldFeaturesFile,
                          Sha1ToString(II->Sha1));
     return true;
