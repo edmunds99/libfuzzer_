@@ -6,78 +6,93 @@
 
 class State {
 public:
-    std::vector<int> state;   // more than 1 state variable (sv)
-    int id;
+	std::vector<int> state;   // more than 1 state variable (sv)
+	int id;
 
-    State(std::initializer_list<int> init) : state(init) {}
+	State(std::initializer_list<int> init) : state(init) {}
 
-    bool operator<(const State& other) const {
-        return state < other.state;
-    }
+	bool operator<(const State& other) const {
+		return state < other.state;
+	}
 };
 
 using Packet = std::vector<uint8_t>;
 
 // define a comparator
 struct StatePairComp {
-    bool operator()(const std::pair<State, State>& a, const std::pair<State, State>& b) const {
-        if (a.first < b.first) return true;
-        if (b.first < a.first) return false;
-        return a.second < b.second;
-    }
+	bool operator()(const std::pair<State, State>& a, const std::pair<State, State>& b) const {
+		if (a.first < b.first) return true;
+		if (b.first < a.first) return false;
+		return a.second < b.second;
+	}
 };
 
 class FSM {
 private:
-    std::map<std::pair<State, State>, Packet, StatePairComp> transitions;
+	std::map<std::pair<State, State>, Packet, StatePairComp> transitions;
 
 public:
-    
-    void addTransition(const State& from, const State& to, const Packet& packet) {
-        transitions[std::make_pair(from, to)] = packet;
-    }
 
-    Packet getTransitionPacket(const State& from, const State& to) const {
-        auto key = std::make_pair(from, to);
-        auto it = transitions.find(key);
-        if (it != transitions.end()) {
-            return it->second;
-        }
-        return {};  
-    }
-  
-    void printTransitions() const {
-        for (const auto& transition : transitions) {
-            std::cout << "Transition from state [";
-            for (auto i : transition.first.first.state) std::cout << i << " ";
-            std::cout << "] to state [";
-            for (auto i : transition.first.second.state) std::cout << i << " ";
-            std::cout << "] with packet: ";
-            for (auto byte : transition.second) std::cout << std::hex << static_cast<int>(byte) << " ";
-            std::cout << std::endl;
-        }
-    }
+	void addTransition(const State& from, const State& to, const Packet& packet) {
+		transitions[std::make_pair(from, to)] = packet;
+	}
+
+	Packet getTransitionPacket(const State& from, const State& to) const {
+		auto key = std::make_pair(from, to);
+		auto it = transitions.find(key);
+		if (it != transitions.end()) {
+			return it->second;
+		}
+		return {};
+	}
+
+	void printTransitions() const {
+		for (const auto& transition : transitions) {
+			std::cout << "Transition from state [";
+			for (auto i : transition.first.first.state) std::cout << i << ' ';
+			std::cout << "] to state [";
+			for (auto i : transition.first.second.state) std::cout << i << ' ';
+			std::cout << "] with packet: ";
+			for (auto byte : transition.second) std::cout << std::hex << static_cast<int>(byte) << " ";
+			std::cout << std::endl;
+		}
+	}
 };
 
 // TBD: add more test to this FSM
 
 // int main() {
-//     FSM fsm;
-//     State s1 = {1, 2, 3};
-//     State s2 = {4, 5, 6};
-//     Packet packet = {0x01, 0x02, 0x03};
+// 	FSM fsm;
+// 	State s1 = { 1, 2, 3 };
+// 	State s2 = { 4, 5, 6 };
+// 	State s3 = { 7, 8, 9 };
+// 	State s4 = { 13, 14, 15 };
+// 	Packet packet = { 0x01, 0x02, 0x03 };
+// 	Packet packet2 = { 0x04, 0x05, 0x06, 0X07, 0X08 };
 
-//     fsm.addTransition(s1, s2, packet);
-//     fsm.printTransitions();
+// 	fsm.addTransition(s1, s2, packet);
+// 	fsm.printTransitions();
 
-//     Packet foundPacket = fsm.getTransitionPacket(s1, s2);
-//     if (!foundPacket.empty()) {
-//         std::cout << "Found packet for transition: ";
-//         for (auto byte : foundPacket) std::cout << std::hex << static_cast<int>(byte) << " ";
-//         std::cout << std::endl;
-//     } else {
-//         std::cout << "No transition found." << std::endl;
-//     }
+// 	Packet foundPacket = fsm.getTransitionPacket(s1, s2);
+// 	if (!foundPacket.empty()) {
+// 		std::cout << "Found packet for transition: ";
+// 		for (auto byte : foundPacket) std::cout << std::hex << static_cast<int>(byte) << " ";
+// 		std::cout << std::endl;
+// 	}
+// 	else {
+// 		std::cout << "No transition found." << std::endl;
+// 	}
 
-//     return 0;
+// 	Packet noTransitionPacket = fsm.getTransitionPacket(s2, s3);
+// 	if (noTransitionPacket.empty()) {
+// 		std::cout << "Correctly identified no transition." << std::endl;
+// 	}
+// 	else {
+// 		std::cout << "Error: Transition should not exist." << std::endl;
+// 	}
+
+// 	fsm.addTransition(s1, s4, packet2);
+// 	fsm.printTransitions(); 
+
+// 	return 0;
 // }

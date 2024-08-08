@@ -1,7 +1,11 @@
 [for update to github]
+
 cp -r /scratch/wjw5351/downloads/llvm-project-llvmorg-13.0.1/compiler-rt/lib/fuzzer/* /scratch/wjw5351/libfuzzer_/libfuzzer_/
 
+
+
 [build/rebuild changed libfuzzer]
+
 cmake -S llvm -B build -G Ninja \
       -DLLVM_ENABLE_PROJECTS="clang" -DBUILD_SHARED_LIBS=ON \
       -DCMAKE_INSTALL_PREFIX=/scratch/wjw5351/opt/llvm-13 \
@@ -10,3 +14,9 @@ cmake -S llvm -B build -G Ninja \
       -DCMAKE_CXX_COMPILER=g++-11 -DCMAKE_C_COMPILER=gcc-11
 cmake --build build -j`nproc`
 cmake --build build --target install
+
+
+
+[replace libfuzzer.a]
+
+cp /scratch/wjw5351/opt/llvm-13/lib/clang/13.0.1/lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer.a /scratch/wjw5351/aosp/prebuilts/clang/host/linux-x86/clang-r498229b/lib/clang/17/lib/x86_64-unknown-linux-gnu  
