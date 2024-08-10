@@ -43,6 +43,8 @@ thread_local bool Fuzzer::IsMyThread;
 
 bool RunningUserCallback = false;
 
+// const int max_state_num=100;   // defined in FuzzerDefs.h
+const int max_state_exec=1000;
 int first_runs=1000000;
 int fixed_consume_size=9;   // is_br + is_initiator + is_peripheral + io_req
 int state_cov_interval=30;
@@ -50,9 +52,9 @@ size_t last_cov=0;
 size_t cur_cov;
 system_clock::time_point last_cov_upd;
 uint8_t m1_m2_sep=250;
-// int executed_state[100];
-std::map<State, int> state_executed;
-int cur_state_id=-1;
+int state_exec_times[max_state_num+5];
+bool state_executed[max_state_num+5];
+State cur_state;
 
 // Only one Fuzzer per process.
 static Fuzzer *F;
@@ -158,7 +160,7 @@ Fuzzer::Fuzzer(UserCallback CB, InputCorpus &Corpus, MutationDispatcher &MD,
       Options.EntropicFeatureFrequencyThreshold;
   fake_entropic.NumberOfRarestFeatures = Options.EntropicNumberOfRarestFeatures;
   fake_entropic.ScalePerExecTime = Options.EntropicScalePerExecTime;
-  for (int i=0; i<100; i++)
+  for (int i=0; i<max_state_num; i++)
     state_corpus[i].initialize(fake_state_corpus_dir, fake_entropic);
     
   if (EF->__sanitizer_set_death_callback)
@@ -543,12 +545,12 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   TPC.CollectFeatures([&](uint32_t Feature) {
     if (Corpus.AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink))
       UniqFeatureSetTmp.push_back(Feature);
-    state_corpus[cur_state_id].AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink);  
+    state_corpus[cur_state.id].AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink);  
     // newly added
     
     if (Options.Entropic) {
       Corpus.UpdateFeatureFrequency(II, Feature);
-      state_corpus[cur_state_id].UpdateFeatureFrequency(II, Feature);   // newly added
+      state_corpus[cur_state.id].UpdateFeatureFrequency(II, Feature);   // newly added
     }
     if (Options.ReduceInputs && II && !II->NeverReduce)
       if (std::binary_search(II->UniqFeatureSet.begin(),
@@ -566,7 +568,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
                            TPC.ObservedFocusFunction(), ForceAddToCorpus,
                            TimeOfUnit, UniqFeatureSetTmp, DFT, II);      // note: add to corpus
     auto state_NewII =
-        state_corpus[cur_state_id].AddToCorpus({Data, Data + Size}, NumNewFeatures, MayDeleteFile,
+        state_corpus[cur_state.id].AddToCorpus({Data, Data + Size}, NumNewFeatures, MayDeleteFile,
                            TPC.ObservedFocusFunction(), ForceAddToCorpus,
                            TimeOfUnit, UniqFeatureSetTmp, DFT, II);      
                            // newly added. add to state_corpus
@@ -583,7 +585,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
       II->U.size() > Size) {
     auto OldFeaturesFile = Sha1ToString(II->Sha1);
     Corpus.Replace(II, {Data, Data + Size});
-    state_corpus[cur_state_id].Replace(II, {Data, Data + Size});   // newly added
+    state_corpus[cur_state.id].Replace(II, {Data, Data + Size});   // newly added
     RenameFeatureSetFile(Options.FeaturesDir, OldFeaturesFile,
                          Sha1ToString(II->Sha1));
     return true;
@@ -811,14 +813,14 @@ void Fuzzer::MutateAndTestOne_FSM() {
   MD.StartMutationSequence();
 
   // auto &II = Corpus.ChooseUnitToMutate(MD.GetRand());   // randomly choose one to mutate
-  auto &II = state_corpus[cur_state_id].ChooseUnitToMutate(MD.GetRand());
+  auto &II = state_corpus[cur_state.id].ChooseUnitToMutate(MD.GetRand());
   // if (Options.DoCrossOver) {
   //   auto &CrossOverII = Corpus.ChooseUnitToCrossOverWith(
   //       MD.GetRand(), Options.CrossOverUniformDist);
   //   MD.SetCrossOverWith(&CrossOverII.U);
   // }
   if (Options.DoCrossOver) {
-    auto &CrossOverII = state_corpus[cur_state_id].ChooseUnitToCrossOverWith(
+    auto &CrossOverII = state_corpus[cur_state.id].ChooseUnitToCrossOverWith(
         MD.GetRand(), Options.CrossOverUniformDist);
     MD.SetCrossOverWith(&CrossOverII.U);
   }
@@ -873,7 +875,7 @@ void Fuzzer::MutateAndTestOne_FSM() {
     Size = NewSize+sep_pos;   // add sep_pos
     II.NumExecutedMutations++;
     Corpus.IncrementNumExecutedMutations();
-    state_corpus[cur_state_id].IncrementNumExecutedMutations();
+    state_corpus[cur_state.id].IncrementNumExecutedMutations();
     bool FoundUniqFeatures = false;
 
     bool NewCov = RunOne(CurrentUnitData, Size, /*MayDeleteFile=*/true, &II,
@@ -909,14 +911,29 @@ int Fuzzer::find_sep_pos(const Unit &U) {
   int cur=fixed_consume_size;
   while (true) {
     if (U[cur]==m1_m2_sep) break;
-    cur+=(U[cur]+1);     // go through a packet
+    cur+=(U[cur]+1);     // go through a packet in m1
   }
   return cur+1;
 }
 
 State Fuzzer::choose_state() {
-  State s{1,2,3}; // fake;
-  return s;
+  for (int i=0; i<fsm.states.size(); i++) {
+    State state=fsm.states[i];
+    if (state_executed[state.id]==0)
+      return state;
+  }
+  return State(-1);
+}
+
+// TBD: parse KLEE transitions
+void Fuzzer::initialize_FSM() {
+  // fake, for test now
+  fsm=FSM();
+  State state_1(1);
+  fsm.states.push_back(state_1);
+  State state_2(2);
+  fsm.states.push_back(state_2);
+
 }
 
 // std::vector<uint8_t> Fuzzer::get_access_sequence (State s)
@@ -932,14 +949,16 @@ std::vector<uint8_t> Fuzzer::get_access_sequence (State s) {
   std::vector<uint8_t> result;
 
   // for test
-  result.push_back(0); // br?
-  result.push_back(1); // initiator?
-  result.push_back(0); // central?
-  for (int i=0; i<6; i++)
-    result.push_back(0);  // io_req
-  result.push_back(m1_m2_sep);
+  if (s.id==1) { // 010 + ...
+    result={0,1,0, 0,0,0,0,0,0};
+  }
+
+  if (s.id==2) {
+    result={0,1,1, 0,0,0,0,0,0};
+  }
 
   // TBD: add packet
+  result.push_back(m1_m2_sep);
 
   return result;
 }
@@ -1050,17 +1069,11 @@ void Fuzzer::ReadAndExecuteSeedCorpora_FSM(Vector<SizedFile> &CorporaFiles) {
     // note: get one state and access sequence, as initial corpus
     Unit U;
     State initial_s=choose_state();
-    cur_state_id=initial_s.id;
+    cur_state.id=initial_s.id;
     std::vector<uint8_t> initial_m1=get_access_sequence(initial_s);
     for (int i=0; i<initial_m1.size(); i++)
       U.push_back(initial_m1[i]);
     U.push_back(1);
-
-    // Printf("1008 U, size=%d\n",U.size());
-    // for (int i=0; i<U.size(); i++)
-    //   Printf("%d",U[i]);
-    // Printf("\n");
-
     RunOne(U.data(), U.size());     // run initial corpus
   } else {
     Printf("INFO: seed corpus: files: %zd min: %zdb max: %zdb total: %zdb"
@@ -1179,20 +1192,25 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
 
   while (true) {
 
-    // compare cur_cov and last_cov, to decide if change a state
-    cur_cov=TPC.GetTotalPCCoverage();
-    if (cur_cov==last_cov) {
+    // compare (1) cur_cov and last_cov, (2) execute times with max_state_exec,  to decide state change
+    if (state_exec_times[cur_state.id]>=max_state_exec || cur_cov==last_cov) {
       auto Now=system_clock::now();
-      if (duration_cast<seconds>(Now - last_cov_upd).count() >= state_cov_interval) {
-        State s=choose_state();
-        cur_state_id=s.id;
-        state_executed[s]=1;    // mark newly chosen state s as 'executed'
-        std::vector<uint8_t> m1=get_access_sequence(s);    // TBD: where to generate and use m1 ??
+      if (state_exec_times[cur_state.id]>=max_state_exec ||
+      duration_cast<seconds>(Now - last_cov_upd).count() >= state_cov_interval) {
+        state_executed[cur_state.id]=true;
+        cur_state=choose_state();
+        std::vector<uint8_t> m1=get_access_sequence(cur_state);  // TBD: where to generate and use m1 ?
+        Unit U;
+        for (int i=0; i<m1.size(); i++)
+          U.push_back(m1[i]);
+        U.push_back(1);
+        RunOne(U.data(), U.size());     // run one test for new state
       }
     } else {
       last_cov=cur_cov;
       last_cov_upd=system_clock::now();
     }
+    state_exec_times[cur_state.id]++;
 
     auto Now = system_clock::now();
     if (!Options.StopFile.empty() &&

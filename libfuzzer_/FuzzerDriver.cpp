@@ -19,7 +19,6 @@
 #include "FuzzerPlatform.h"
 #include "FuzzerRandom.h"
 #include "FuzzerTracePC.h"
-#include "FSM.h"
 // #include "FSM_new.h"
 #include <algorithm>
 #include <atomic>
@@ -643,23 +642,6 @@ int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
   using namespace fuzzer;
   assert(argc && argv && "Argument pointers cannot be nullptr");
 
-  // newly added
-  Printf("HELLO WORLD\n");
-  FSM fsm;
-  fsm.readFSMfile(fsmDir);
-  int s1=0, s2=14;
-  int e=fsm.checkTrans(s1,s2);
-  Printf("e=%d\n",e);
-
-  // print one example path value
-  if (e>0) {
-    for (int i=0; i<fsm.trans[s1][s2][e][0].size();i++) {
-      Printf("objName=%s,objHex=%s\n",fsm.trans[s1][s2][e][0][i].name.c_str(),
-      fsm.trans[s1][s2][e][0][i].hex.c_str());
-    }
-  }
-  // end newly added
-
   std::string Argv0((*argv)[0]);
   EF = new ExternalFunctions();
   if (EF->LLVMFuzzerInitialize)
@@ -828,6 +810,7 @@ int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
   auto *MD = new MutationDispatcher(Rand, Options);
   auto *Corpus = new InputCorpus(Options.OutputCorpus, Entropic);
   auto *F = new Fuzzer(Callback, *Corpus, *MD, Options);
+  F->initialize_FSM();
 
   for (auto &U: Dictionary)
     if (U.size() <= Word::GetMaxSize())

@@ -39,7 +39,9 @@ public:
   ~Fuzzer();
   void Loop(Vector<SizedFile> &CorporaFiles);
 
-  void Loop_FSM(Vector<SizedFile> &CorporaFiles);
+  // newly added
+  void initialize_FSM();
+  void Loop_FSM(Vector<SizedFile> &CorporaFiles); 
 
   void ReadAndExecuteSeedCorpora(Vector<SizedFile> &CorporaFiles);
   void ReadAndExecuteSeedCorpora_FSM(Vector<SizedFile> &CorporaFiles);
@@ -147,7 +149,7 @@ private:
   FuzzingOptions Options;
   DataFlowTrace DFT;
 
-  InputCorpus state_corpus[100];
+  InputCorpus state_corpus[fuzzer::max_state_num];
 
   system_clock::time_point ProcessStartTime = system_clock::now();
   system_clock::time_point UnitStartTime, UnitStopTime;
@@ -162,6 +164,9 @@ private:
 
   // Need to know our own thread.
   static thread_local bool IsMyThread;
+
+  // newly added FSM
+  FSM fsm;
 };
 
 struct ScopedEnableMsanInterceptorChecks {

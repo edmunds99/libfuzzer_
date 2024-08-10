@@ -9,6 +9,8 @@ public:
 	std::vector<int> state;   // more than 1 state variable (sv)
 	int id;
 
+	State() {} 
+	State(int id) : id(id) {} 
 	State(std::initializer_list<int> init) : state(init) {}
 
 	bool operator<(const State& other) const {
@@ -28,10 +30,11 @@ struct StatePairComp {
 };
 
 class FSM {
-private:
-	std::map<std::pair<State, State>, Packet, StatePairComp> transitions;
 
 public:
+
+	std::vector<State> states;
+	std::map<std::pair<State, State>, Packet, StatePairComp> transitions;
 
 	void addTransition(const State& from, const State& to, const Packet& packet) {
 		transitions[std::make_pair(from, to)] = packet;
