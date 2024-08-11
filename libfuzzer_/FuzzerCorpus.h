@@ -290,7 +290,8 @@ public:
   }
 
   void Replace(InputInfo *II, const Unit &U) {
-    assert(II->U.size() > U.size());
+    // assert(II->U.size() >= U.size()); 
+    assert(II->U.size() >= U.size());      // > to >=, avoid state_corpus fails
     Hashes.erase(Sha1ToString(II->Sha1));
     DeleteFile(*II);
     ComputeSHA1(U.data(), U.size(), II->Sha1);

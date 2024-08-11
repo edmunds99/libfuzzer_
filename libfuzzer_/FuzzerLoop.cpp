@@ -537,6 +537,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   assert(Size < std::numeric_limits<uint32_t>::max());
 
   ExecuteCallback(Data, Size);      // note: execute (self defined) Fuzz
+  state_exec_times[cur_state.id]++; 
   auto TimeOfUnit = duration_cast<microseconds>(UnitStopTime - UnitStartTime);
 
   UniqFeatureSetTmp.clear();
@@ -545,8 +546,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   TPC.CollectFeatures([&](uint32_t Feature) {
     if (Corpus.AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink))
       UniqFeatureSetTmp.push_back(Feature);
-    state_corpus[cur_state.id].AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink);  
-    // newly added
+    state_corpus[cur_state.id].AddFeature(Feature, static_cast<uint32_t>(Size), Options.Shrink);  // newly added
     
     if (Options.Entropic) {
       Corpus.UpdateFeatureFrequency(II, Feature);
@@ -557,6 +557,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
                              II->UniqFeatureSet.end(), Feature))
         FoundUniqFeaturesOfII++;
   });
+
   if (FoundUniqFeatures)
     *FoundUniqFeatures = FoundUniqFeaturesOfII;
   PrintPulseAndReportSlowInput(Data, Size);
@@ -579,6 +580,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
                                  MD.MutationSequence());
     return true;
   }
+
   if (II && FoundUniqFeaturesOfII &&
       II->DataFlowTraceForFocusFunction.empty() &&
       FoundUniqFeaturesOfII == II->UniqFeatureSet.size() &&
@@ -586,6 +588,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
     auto OldFeaturesFile = Sha1ToString(II->Sha1);
     Corpus.Replace(II, {Data, Data + Size});
     state_corpus[cur_state.id].Replace(II, {Data, Data + Size});   // newly added
+    // Printf("state corpus replace success 590\n");
     RenameFeatureSetFile(Options.FeaturesDir, OldFeaturesFile,
                          Sha1ToString(II->Sha1));
     return true;
@@ -927,6 +930,11 @@ State Fuzzer::choose_state() {
 
 // TBD: parse KLEE transitions
 void Fuzzer::initialize_FSM() {
+
+  for (int i=0; i<max_state_num; i++) {
+    state_exec_times[i]=0;
+    state_executed[i]=false;
+  }
   // fake, for test now
   fsm=FSM();
   State state_1(1);
@@ -1193,10 +1201,12 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
   while (true) {
 
     // compare (1) cur_cov and last_cov, (2) execute times with max_state_exec,  to decide state change
+    cur_cov=TPC.GetTotalPCCoverage();
     if (state_exec_times[cur_state.id]>=max_state_exec || cur_cov==last_cov) {
       auto Now=system_clock::now();
       if (state_exec_times[cur_state.id]>=max_state_exec ||
       duration_cast<seconds>(Now - last_cov_upd).count() >= state_cov_interval) {
+        Printf("choose a new state...\n");
         state_executed[cur_state.id]=true;
         cur_state=choose_state();
         std::vector<uint8_t> m1=get_access_sequence(cur_state);  // TBD: where to generate and use m1 ?
@@ -1210,7 +1220,7 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
       last_cov=cur_cov;
       last_cov_upd=system_clock::now();
     }
-    state_exec_times[cur_state.id]++;
+    // Printf("cur_state id=%d, exec times=%d\n", cur_state.id, state_exec_times[cur_state.id]);
 
     auto Now = system_clock::now();
     if (!Options.StopFile.empty() &&
