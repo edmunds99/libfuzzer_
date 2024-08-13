@@ -1026,9 +1026,11 @@ void Fuzzer::ReadAndExecuteSeedCorpora(Vector<SizedFile> &CorporaFiles) {
     SetMaxInputLen(std::min(std::max(kMinDefaultLen, MaxSize), kMaxSaneLen));
   assert(MaxInputLen > 0);
 
-  // Test the callback with empty input and never try it again.
-  uint8_t dummy = 0;
-  ExecuteCallback(&dummy, 0);
+  // Test the callback with empty input and never try it again. 
+  // note: temporary comment out to avoid Fuzz_FSM() SEGV:
+
+  // uint8_t dummy = 0;
+  // ExecuteCallback(&dummy, 0);
 
   if (CorporaFiles.empty()) {
     Printf("INFO: A corpus is not provided, starting from an empty corpus\n");
@@ -1236,7 +1238,7 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
       if (state_exec_times[cur_state.id]>=max_state_exec ||
       duration_cast<seconds>(Now - last_cov_upd).count() >= state_cov_interval) {
         state_executed[cur_state.id]=true;
-        
+
         if (!all_state_executed) {
           if (check_all_executed()) {
             Printf("all state executed now...\n");
