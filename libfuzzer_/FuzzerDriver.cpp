@@ -810,11 +810,11 @@ int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
   auto *MD = new MutationDispatcher(Rand, Options);
   auto *Corpus = new InputCorpus(Options.OutputCorpus, Entropic);
   auto *F = new Fuzzer(Callback, *Corpus, *MD, Options);
-  F->initialize_FSM();
+  F->initialize_FSM();       // initialize FSM
 
   for (auto &U: Dictionary)
     if (U.size() <= Word::GetMaxSize())
-      MD->AddWordToManualDictionary(Word(U.data(), U.size()));
+      MD->AddWordToManualDictionary(Word(U.data(), U.size()));    // ???
 
       // Threads are only supported by Chrome. Don't use them with emscripten
       // for now.
@@ -907,7 +907,12 @@ int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
   }
 
   auto CorporaFiles = ReadCorpora(*Inputs, ParseSeedInuts(Flags.seed_inputs));
-  F->Loop_FSM(CorporaFiles);     // note: run the Loop_FSM function (entry)
+  if (CorporaFiles.empty()) {
+    F->Loop_FSM(CorporaFiles);     // run the Loop_FSM to fuzz every state
+  }
+  else {
+    F->Loop(CorporaFiles);   // have fuzzed every state in previous test
+  }
 
   if (Flags.verbosity)
     Printf("Done %zd runs in %zd second(s)\n", F->getTotalNumberOfRuns(),

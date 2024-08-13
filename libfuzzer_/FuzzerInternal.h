@@ -111,6 +111,7 @@ private:
   int find_sep_pos(const Unit &U);
   void reverse_data(uint8_t* data, size_t size);
   State choose_state();
+  bool check_all_executed();
   std::vector<uint8_t> get_access_sequence(State s);
 
   void PurgeAllocator();
