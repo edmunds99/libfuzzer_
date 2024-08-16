@@ -44,12 +44,9 @@ public:
 	std::vector<uint8_t> fake_rand;
 	std::vector<uint8_t> fake_pub_key;
 	std::vector<uint8_t> fake_dhkey_check;
-	uint32_t fixed_eccx[8] = {
-   		2198633781, 2475574431, 2735915610, 1722828383, 3606873419, 2458771352, 2385206393, 1720691774,
-	};
-	const uint32_t fixed_eccy[8] = {
-   		2556214130, 2565982928, 3359245577, 1000677376, 3540911383, 3871339133, 422803352, 122696205,
-	};
+	std::vector<uint8_t> asso_model_pair[10][2];   // 9 association models with pair_req/rsp
+	uint32_t fixed_eccx[8] = {2198633781, 2475574431, 2735915610, 1722828383, 3606873419, 2458771352, 2385206393, 1720691774};
+	uint32_t fixed_eccy[8] = {2556214130, 2565982928, 3359245577, 1000677376, 3540911383, 3871339133, 422803352, 122696205};
 	uint8_t fixed_ecc32x[32]={0};
 	uint8_t fixed_ecc32y[32]={0};
 
@@ -79,6 +76,31 @@ public:
 	}
 
 	void initialize_fake_value() {
+		// for (int i=0; i<9; i++) {
+		// 	asso_model_pair[i][0].resize(7,0); asso_model_pair[i][0][0]=1;
+		// 	asso_model_pair[i][1].resize(7,0); asso_model_pair[i][0][0]=2;
+		// }
+		// cmd, io_cap, oob_flag, auth_req, enc_size, ik, rk. 
+		// auth_req: bf:2, mitm:1, sc:1, kp:1, reserved:3  0xc0 -> 0x1100000 (bf set)
+		asso_model_pair[0][0]={0, 0, 0xc0, 8, 0, 0};
+		asso_model_pair[0][1]={3, 0, 0, 0xc0, 8, 0, 0};
+		asso_model_pair[1][0]={4, 0, 0xc0&(4), 8, 0, 0};
+		asso_model_pair[1][1]={3, 1, 0, 0xc0&(4), 8, 0, 0};
+		asso_model_pair[2][0]={0, 1, 0xc0, 8, 0, 0};
+		asso_model_pair[2][1]={3, 0, 1, 0xc0, 8, 0, 0};
+		asso_model_pair[3][0]={1, 0, 0xc0&(4), 8, 0, 0};
+		asso_model_pair[3][1]={3, 4, 0, 0xc0&(4), 8, 0, 0};
+		asso_model_pair[4][0]={0, 0, 0xc0&(8), 8, 0, 0};
+		asso_model_pair[4][1]={3, 0, 0, 0xc0&(8), 8, 0, 0};
+		asso_model_pair[5][0]={1, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[5][1]={3, 1, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[6][0]={2, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[6][1]={3, 0, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[7][0]={0, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[7][1]={3, 2, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[8][0]={0, 1, 0xc0, 8, 0, 0};
+		asso_model_pair[8][1]={3, 0, 1, 0xc0, 8, 0, 0};
+
 		fake_confirm.resize(17,0); fake_confirm[0]=3;
 		fake_rand.resize(17,0); fake_rand[0]=4;
 
@@ -91,8 +113,40 @@ public:
 		fake_dhkey_check.resize(17,0); fake_dhkey_check[0]=13;
 	}
 
-	void CreateManualAccessSeq() {
-
+	// State s:  role(0:central, 1:peripheral), state, asso_model
+	void CreateManualAccessSeq(State s) {
+		if (s.state[0]==0 && s.state[1]==5) {
+			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+			asso_model_pair[s.state[2]][1]};
+		}
+		if (s.state[0]==0 && s.state[1]==6) {
+			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+			asso_model_pair[s.state[2]][1], fake_confirm};
+		}
+		if (s.state[0]==0 && s.state[1]==7) {
+			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+			asso_model_pair[s.state[2]][1]};
+		}
+		if (s.state[0]==0 && s.state[1]==9) {
+			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+			asso_model_pair[s.state[2]][1], fake_pub_key};
+		}
+		if (s.state[0]==0 && s.state[1]==10) {
+			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+			asso_model_pair[s.state[2]][1], fake_confirm};
+		}
+		if (s.state[0]==0 && s.state[1]==12) {
+			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+			asso_model_pair[s.state[2]][1], fake_confirm, fake_rand};
+		}
+		if (s.state[0]==0 && s.state[1]==14) {
+			if (s.state[2]<=3)
+				stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+				asso_model_pair[s.state[2]][1], fake_confirm, fake_rand};
+			else 
+				stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
+				asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm, fake_rand, fake_dhkey_check};
+		}
 	}
 };
 
