@@ -506,6 +506,7 @@ private:
     DistributionNeedsUpdate = false;
 
     size_t N = Inputs.size();
+    Printf("509 input size=%zu\n", N);
     assert(N);
     Intervals.resize(N + 1);
     Weights.resize(N);

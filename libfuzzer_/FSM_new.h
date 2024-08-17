@@ -83,34 +83,34 @@ public:
 		// cmd, io_cap, oob_flag, auth_req, enc_size, ik, rk. 
 		// auth_req: bf:2, mitm:1, sc:1, kp:1, reserved:3  0xc0 -> 0x1100000 (bf set)
 		asso_model_pair[0][0]={0, 0, 0xc0, 8, 0, 0};
-		asso_model_pair[0][1]={3, 0, 0, 0xc0, 8, 0, 0};
-		asso_model_pair[1][0]={4, 0, 0xc0&(4), 8, 0, 0};
-		asso_model_pair[1][1]={3, 1, 0, 0xc0&(4), 8, 0, 0};
+		asso_model_pair[0][1]={7, 2, 0, 0, 0xc0, 8, 0, 0};
+		asso_model_pair[1][0]={4, 0, 0xc0|(4), 8, 0, 0};
+		asso_model_pair[1][1]={7, 2, 1, 0, 0xc0|(4), 8, 0, 0};
 		asso_model_pair[2][0]={0, 1, 0xc0, 8, 0, 0};
-		asso_model_pair[2][1]={3, 0, 1, 0xc0, 8, 0, 0};
-		asso_model_pair[3][0]={1, 0, 0xc0&(4), 8, 0, 0};
-		asso_model_pair[3][1]={3, 4, 0, 0xc0&(4), 8, 0, 0};
-		asso_model_pair[4][0]={0, 0, 0xc0&(8), 8, 0, 0};
-		asso_model_pair[4][1]={3, 0, 0, 0xc0&(8), 8, 0, 0};
-		asso_model_pair[5][0]={1, 0, 0xc0&(4)&(8), 8, 0, 0};
-		asso_model_pair[5][1]={3, 1, 0, 0xc0&(4)&(8), 8, 0, 0};
-		asso_model_pair[6][0]={2, 0, 0xc0&(4)&(8), 8, 0, 0};
-		asso_model_pair[6][1]={3, 0, 0, 0xc0&(4)&(8), 8, 0, 0};
-		asso_model_pair[7][0]={0, 0, 0xc0&(4)&(8), 8, 0, 0};
-		asso_model_pair[7][1]={3, 2, 0, 0xc0&(4)&(8), 8, 0, 0};
+		asso_model_pair[2][1]={7, 2, 0, 1, 0xc0, 8, 0, 0};
+		asso_model_pair[3][0]={1, 0, 0xc0|(4), 8, 0, 0};
+		asso_model_pair[3][1]={7, 2, 4, 0, 0xc0|(4), 8, 0, 0};
+		asso_model_pair[4][0]={0, 0, 0xc0|(8), 8, 0, 0};
+		asso_model_pair[4][1]={7, 2, 0, 0, 0xc0&(8), 8, 0, 0};
+		asso_model_pair[5][0]={1, 0, 0xc0|(4)|(8), 8, 0, 0};
+		asso_model_pair[5][1]={7, 2, 1, 0, 0xc0|(4)|(8), 8, 0, 0};
+		asso_model_pair[6][0]={2, 0, 0xc0|(4)|(8), 8, 0, 0};
+		asso_model_pair[6][1]={7, 2, 0, 0, 0xc0|(4)|(8), 8, 0, 0};
+		asso_model_pair[7][0]={0, 0, 0xc0|(4)|(8), 8, 0, 0};
+		asso_model_pair[7][1]={7, 2, 2, 0, 0xc0|(4)|(8), 8, 0, 0};
 		asso_model_pair[8][0]={0, 1, 0xc0, 8, 0, 0};
-		asso_model_pair[8][1]={3, 0, 1, 0xc0, 8, 0, 0};
+		asso_model_pair[8][1]={7, 2, 0, 1, 0xc0, 8, 0, 0};
 
-		fake_confirm.resize(17,0); fake_confirm[0]=3;
-		fake_rand.resize(17,0); fake_rand[0]=4;
+		fake_confirm.resize(18,0); fake_confirm[0]=17; fake_confirm[1]=3;
+		fake_rand.resize(18,0); fake_rand[0]=17; fake_rand[1]=4;
 
-		fake_pub_key.resize(65,0); fake_pub_key[0]=12;
+		fake_pub_key.resize(66,0); fake_pub_key[0]=65; fake_pub_key[1]=12;
 		memcpy(fixed_ecc32x, fixed_eccx, 32);
       	memcpy(fixed_ecc32y, fixed_eccy, 32);
 		for (int i=1; i<=32; i++) fake_pub_key[i]=fixed_ecc32x[i-1];
       	for (int i=33; i<=64; i++) fake_pub_key[i]=fixed_ecc32y[i-33];
 		
-		fake_dhkey_check.resize(17,0); fake_dhkey_check[0]=13;
+		fake_dhkey_check.resize(18,0); fake_dhkey_check[0]=17; fake_dhkey_check[1]=13;
 	}
 
 	// State s:  role(0:central, 1:peripheral), state, asso_model
@@ -119,6 +119,9 @@ public:
 			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
 			asso_model_pair[s.state[2]][1]};
 		}
+		// std::cout<<"enter fsm_new 122"<<std::endl;
+		// for (int i=0; i<asso_model_pair[s.state[2]][0].size(); i++)
+		// 	std::cout<<asso_model_pair[s.state[2]][0][i]<<' ';
 		if (s.state[0]==0 && s.state[1]==6) {
 			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
 			asso_model_pair[s.state[2]][1], fake_confirm};
@@ -140,10 +143,10 @@ public:
 			asso_model_pair[s.state[2]][1], fake_confirm, fake_rand};
 		}
 		if (s.state[0]==0 && s.state[1]==14) {
-			if (s.state[2]<=3)
+			if (s.state[2]<=3) // <=3, legacy
 				stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
 				asso_model_pair[s.state[2]][1], fake_confirm, fake_rand};
-			else 
+			else // >=4, sc
 				stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
 				asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm, fake_rand, fake_dhkey_check};
 		}

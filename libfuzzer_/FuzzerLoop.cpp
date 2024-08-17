@@ -945,15 +945,39 @@ void Fuzzer::initialize_FSM() {
     state_executed[i]=false;
   }
   // fake, for test now
+
+  // test for legacy central
   fsm=FSM();
-  State state_1(1);
-  fsm.states.push_back(state_1);
-  State state_2(2);
-  fsm.states.push_back(state_2);
-  State state_3(3);
-  fsm.states.push_back(state_3);
+  fsm.initialize_fake_value();
+  fsm.states.push_back(State({0, 5, 0}, 1));
+  fsm.states.push_back(State({0, 5, 1}, 2));
+  fsm.states.push_back(State({0, 5, 3}, 3));
+  fsm.states.push_back(State({0, 6, 0}, 4));
+  fsm.states.push_back(State({0, 6, 1}, 5));
+  fsm.states.push_back(State({0, 6, 3}, 6));
+  fsm.states.push_back(State({0, 14, 0}, 7));
+  fsm.states.push_back(State({0, 14, 1}, 8));
+  fsm.states.push_back(State({0, 14, 3}, 9));
+
+  // test for sc justwork / num comp
+  fsm.states.push_back(State({0, 7, 4}, 10));
+  fsm.states.push_back(State({0, 7, 5}, 11));
+  fsm.states.push_back(State({0, 9, 4}, 12));
+  fsm.states.push_back(State({0, 9, 5}, 13));
+  fsm.states.push_back(State({0, 10, 4}, 14));
+  fsm.states.push_back(State({0, 10, 5}, 15));
+  fsm.states.push_back(State({0, 12, 4}, 16));
+  fsm.states.push_back(State({0, 12, 5}, 17));
+  fsm.states.push_back(State({0, 14, 4}, 18));
+  fsm.states.push_back(State({0, 14, 5}, 19));
+
+  // TBD: add manual state for oob (sc and legacy) and sc passkey
+  // sc passkey needs 20 rounds. oob?
   
-  state_count=3;
+  state_count=19;
+  for (int i=0; i<fsm.states.size(); i++)
+    fsm.CreateManualAccessSeq(fsm.states[i]);
+  // Printf("statemap 1 size=%d\n", fsm.stateToPacketsMap[fsm.states[0]].size());
 }
 
 bool Fuzzer::check_all_executed() {
@@ -967,30 +991,15 @@ bool Fuzzer::check_all_executed() {
 
 // std::vector<uint8_t> Fuzzer::get_access_sequence (State s)
 // TBD:  (1) use state s, (2) pre-process io_req, (3) parse from FSM
-std::vector<uint8_t> Fuzzer::get_access_sequence (State s) {
-
-  /* auto is_br = fdp.ConsumeBool();         1 byte
-  auto is_initiator = fdp.ConsumeBool();     1 byte
-  is_peripheral = fdp.ConsumeBool();         1 byte
-  fdp.ConsumeData(&io_req, sizeof(io_req));  6 byte
-  */
+std::vector<uint8_t> Fuzzer::get_access_sequence(State s) {
 
   std::vector<uint8_t> result;
 
-  // for test
-  if (s.id==1) { // 010 + ...
-    result={0,1,0, 0,0,0,0,0,0};
-  }
-
-  if (s.id==2) {
-    result={0,0,0, 0,0,0,0,0,0};
-  }
-
-  if (s.id==3) {
-    result={0,1,1, 0,0,0,0,0,0};
-  }
-
   // TBD: add packet
+  for (int i=0; i<fsm.stateToPacketsMap[s].size(); i++) {
+    for (int j=0; j<fsm.stateToPacketsMap[s][i].size(); j++) 
+      result.push_back(fsm.stateToPacketsMap[s][i][j]);
+  }
   result.push_back(m1_m2_sep);
 
   return result;
@@ -1105,8 +1114,10 @@ void Fuzzer::ReadAndExecuteSeedCorpora_FSM(Vector<SizedFile> &CorporaFiles) {
     // note: get one state and access sequence, as initial corpus
     Unit U;
     State initial_s=choose_state();
-    cur_state.id=initial_s.id;
-    std::vector<uint8_t> initial_m1=get_access_sequence(initial_s);
+    cur_state=initial_s;
+    Printf("cur state, role=%d, state=%d, asso_model=%d\n", 
+    cur_state.state[0],  cur_state.state[1],  cur_state.state[2]);
+    std::vector<uint8_t> initial_m1=get_access_sequence(cur_state);
     for (int i=0; i<initial_m1.size(); i++)
       U.push_back(initial_m1[i]);
     U.push_back(1);
@@ -1249,6 +1260,8 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
         if (!all_state_executed) {
           Printf("choose a new state...\n");
           cur_state=choose_state();
+          Printf("new state, role=%d, smp_cb state=%d, asso_model=%d\n", 
+          cur_state.state[0], cur_state.state[1], cur_state.state[2]);
           std::vector<uint8_t> m1=get_access_sequence(cur_state);  // TBD: where to generate and use m1 ?
           Unit U;
           for (int i=0; i<m1.size(); i++)
