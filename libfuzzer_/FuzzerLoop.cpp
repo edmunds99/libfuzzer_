@@ -56,6 +56,7 @@ int state_exec_times[max_state_num+5];
 bool state_executed[max_state_num+5];
 bool all_state_executed=false;
 State cur_state;
+bool new_choose_state; 
 
 // Only one Fuzzer per process.
 static Fuzzer *F;
@@ -565,7 +566,9 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
     *FoundUniqFeatures = FoundUniqFeaturesOfII;
   PrintPulseAndReportSlowInput(Data, Size);
   size_t NumNewFeatures = Corpus.NumFeatureUpdates() - NumUpdatesBefore;
-  if (NumNewFeatures || ForceAddToCorpus) {
+
+  if ((NumNewFeatures || ForceAddToCorpus) || new_choose_state) {  // add to corpus when new state chosen (and state corpus empty)
+    // Printf("NumNewFeatures 569\n");
     TPC.UpdateObservedPCs();
     auto NewII =
         Corpus.AddToCorpus({Data, Data + Size}, NumNewFeatures, MayDeleteFile,
@@ -575,9 +578,8 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
       auto state_NewII =
           state_corpus[cur_state.id].AddToCorpus({Data, Data + Size}, NumNewFeatures, MayDeleteFile,
                             TPC.ObservedFocusFunction(), ForceAddToCorpus,
-                            TimeOfUnit, UniqFeatureSetTmp, DFT, II);      
-                           // newly added. add to state_corpus
-    }
+                            TimeOfUnit, UniqFeatureSetTmp, DFT, II);  
+    }      // newly added. add to state_corpus
 
     WriteFeatureSetToFile(Options.FeaturesDir, Sha1ToString(NewII->Sha1),
                           NewII->UniqFeatureSet);
@@ -1260,6 +1262,7 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
         if (!all_state_executed) {
           Printf("choose a new state...\n");
           cur_state=choose_state();
+          new_choose_state=true;
           Printf("new state, role=%d, smp_cb state=%d, asso_model=%d\n", 
           cur_state.state[0], cur_state.state[1], cur_state.state[2]);
           std::vector<uint8_t> m1=get_access_sequence(cur_state);  // TBD: where to generate and use m1 ?
@@ -1268,6 +1271,7 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
             U.push_back(m1[i]);
           U.push_back(1);                 // add a random num
           RunOne(U.data(), U.size());     // run one test for new state
+          new_choose_state=false;
         }
         
       }
