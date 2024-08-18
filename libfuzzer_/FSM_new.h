@@ -91,7 +91,7 @@ public:
 		asso_model_pair[3][0]={1, 0, 0xc0|(4), 8, 0, 0};
 		asso_model_pair[3][1]={7, 2, 4, 0, 0xc0|(4), 8, 0, 0};
 		asso_model_pair[4][0]={0, 0, 0xc0|(8), 8, 0, 0};
-		asso_model_pair[4][1]={7, 2, 0, 0, 0xc0&(8), 8, 0, 0};
+		asso_model_pair[4][1]={7, 2, 0, 0, 0xc0|(8), 8, 0, 0};
 		asso_model_pair[5][0]={1, 0, 0xc0|(4)|(8), 8, 0, 0};
 		asso_model_pair[5][1]={7, 2, 1, 0, 0xc0|(4)|(8), 8, 0, 0};
 		asso_model_pair[6][0]={2, 0, 0xc0|(4)|(8), 8, 0, 0};
