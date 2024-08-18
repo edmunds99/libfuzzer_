@@ -46,7 +46,7 @@ bool RunningUserCallback = false;
 // const int max_state_num=100;   // defined in FuzzerDefs.h
 const int max_state_exec=1000;
 int fixed_consume_size=9;   // is_br + is_initiator + is_peripheral + io_req
-int state_cov_interval=30;
+int state_cov_interval=10;
 size_t last_cov=0;
 size_t cur_cov;
 system_clock::time_point last_cov_upd;
@@ -973,8 +973,11 @@ void Fuzzer::initialize_FSM() {
   fsm.states.push_back(State({0, 14, 4}, 18));
   fsm.states.push_back(State({0, 14, 5}, 19));
 
-  // TBD: add manual state for oob (sc and legacy) and sc passkey
-  // sc passkey needs 20 rounds. oob?
+  // TBD: add manual state and trans for 
+  // (1) oob(sc and legacy) and sc passkey, state 0 and 3 (no asso_model)
+  // (2) br
+  // (3) peripheral
+
   
   state_count=19;
   for (int i=0; i<fsm.states.size(); i++)

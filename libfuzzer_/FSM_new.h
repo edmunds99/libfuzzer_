@@ -107,8 +107,8 @@ public:
 		fake_pub_key.resize(66,0); fake_pub_key[0]=65; fake_pub_key[1]=12;
 		memcpy(fixed_ecc32x, fixed_eccx, 32);
       	memcpy(fixed_ecc32y, fixed_eccy, 32);
-		for (int i=1; i<=32; i++) fake_pub_key[i]=fixed_ecc32x[i-1];
-      	for (int i=33; i<=64; i++) fake_pub_key[i]=fixed_ecc32y[i-33];
+		for (int i=2; i<=33; i++) fake_pub_key[i]=fixed_ecc32x[i-2];
+      	for (int i=34; i<=65; i++) fake_pub_key[i]=fixed_ecc32y[i-34];
 		
 		fake_dhkey_check.resize(18,0); fake_dhkey_check[0]=17; fake_dhkey_check[1]=13;
 	}
@@ -136,11 +136,11 @@ public:
 		}
 		if (s.state[0]==0 && s.state[1]==10) {
 			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1], fake_confirm};
+			asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm};
 		}
 		if (s.state[0]==0 && s.state[1]==12) {
 			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1], fake_confirm, fake_rand};
+			asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm, fake_rand};
 		}
 		if (s.state[0]==0 && s.state[1]==14) {
 			if (s.state[2]<=3) // <=3, legacy
