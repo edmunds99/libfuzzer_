@@ -44,8 +44,7 @@ thread_local bool Fuzzer::IsMyThread;
 bool RunningUserCallback = false;
 
 // const int max_state_num=100;   // defined in FuzzerDefs.h
-const int max_state_exec=1000;
-int fixed_consume_size=9;   // is_br + is_initiator + is_peripheral + io_req
+const int max_state_exec=10000;
 int state_cov_interval=10;
 size_t last_cov=0;
 size_t cur_cov;
@@ -56,7 +55,10 @@ int state_exec_times[max_state_num+5];
 bool state_executed[max_state_num+5];
 bool all_state_executed=false;
 State cur_state;
-bool new_choose_state; 
+
+bool new_choose_state;     
+// must add to state corpus for newly chosen state (even if cov no increase)
+// to avoid empty state corpus
 
 // Only one Fuzzer per process.
 static Fuzzer *F;
@@ -912,21 +914,11 @@ void Fuzzer::MutateAndTestOne_FSM() {
   II.NeedsEnergyUpdate = true;
 }
 
-void Fuzzer::reverse_data(uint8_t* data, size_t size) {
-  uint8_t tmp;
-  for (size_t i=0; i<size; i++) {
-    tmp=data[i];
-    data[i]=data[size-i-1];
-    data[size-i-1]=tmp;
-  }
-}
-
+// e.g. 0 1 0  ...  250, 1, return is the position of 1 after 250
+// needs a more efficient way to find
 int Fuzzer::find_sep_pos(const Unit &U) {
-  int cur=fixed_consume_size;
-  while (true) {
-    if (U[cur]==m1_m2_sep) break;
-    cur+=(U[cur]+1);     // go through a packet in m1
-  }
+  int cur=0;
+  while (U[cur]!=m1_m2_sep) cur++;
   return cur+1;
 }
 
@@ -946,48 +938,18 @@ void Fuzzer::initialize_FSM() {
     state_exec_times[i]=0;
     state_executed[i]=false;
   }
-  // fake, for test now
 
-  // test for legacy central
   fsm=FSM();
-  fsm.initialize_fake_value();
-  fsm.states.push_back(State({0, 5, 0}, 1));
-  fsm.states.push_back(State({0, 5, 1}, 2));
-  fsm.states.push_back(State({0, 5, 3}, 3));
-  fsm.states.push_back(State({0, 6, 0}, 4));
-  fsm.states.push_back(State({0, 6, 1}, 5));
-  fsm.states.push_back(State({0, 6, 3}, 6));
-  fsm.states.push_back(State({0, 14, 0}, 7));
-  fsm.states.push_back(State({0, 14, 1}, 8));
-  fsm.states.push_back(State({0, 14, 3}, 9));
+  std::string filepath="/scratch/wjw5351/aosp/packages/modules/Bluetooth/system/stack/analyzers/states_new2.txt";
+  fsm.parseAccSeq(filepath);
+  Printf("finished parse acc seq\n");
+  fsm.printAccSeq();
 
-  // test for sc justwork / num comp
-  fsm.states.push_back(State({0, 7, 4}, 10));
-  fsm.states.push_back(State({0, 7, 5}, 11));
-  fsm.states.push_back(State({0, 9, 4}, 12));
-  fsm.states.push_back(State({0, 9, 5}, 13));
-  fsm.states.push_back(State({0, 10, 4}, 14));
-  fsm.states.push_back(State({0, 10, 5}, 15));
-  fsm.states.push_back(State({0, 12, 4}, 16));
-  fsm.states.push_back(State({0, 12, 5}, 17));
-  fsm.states.push_back(State({0, 14, 4}, 18));
-  fsm.states.push_back(State({0, 14, 5}, 19));
-
-  // TBD: add manual state and trans for 
-  // (1) oob(sc and legacy) and sc passkey, state 0 and 3 (no asso_model)
-  // (2) br
-  // (3) peripheral
-
-  
-  state_count=19;
-  for (int i=0; i<fsm.states.size(); i++)
-    fsm.CreateManualAccessSeq(fsm.states[i]);
-  // Printf("statemap 1 size=%d\n", fsm.stateToPacketsMap[fsm.states[0]].size());
 }
 
 bool Fuzzer::check_all_executed() {
-  for (int i=1; i<=state_count; i++) {
-    if (state_executed[i]==false) 
+  for (int i=0; i<=fsm.states.size(); i++) {
+    if (state_executed[fsm.states[i].id]==false) 
       return false;
   }
   all_state_executed=true;
@@ -995,16 +957,11 @@ bool Fuzzer::check_all_executed() {
 }
 
 // std::vector<uint8_t> Fuzzer::get_access_sequence (State s)
-// TBD:  (1) use state s, (2) pre-process io_req, (3) parse from FSM
 std::vector<uint8_t> Fuzzer::get_access_sequence(State s) {
 
   std::vector<uint8_t> result;
-
-  // TBD: add packet
-  for (int i=0; i<fsm.stateToPacketsMap[s].size(); i++) {
-    for (int j=0; j<fsm.stateToPacketsMap[s][i].size(); j++) 
-      result.push_back(fsm.stateToPacketsMap[s][i][j]);
-  }
+  for (int i=0; i<fsm.AccSeq[s.id].size(); i++) 
+    result.push_back(fsm.AccSeq[s.id][i]);
   result.push_back(m1_m2_sep);
 
   return result;
@@ -1115,18 +1072,19 @@ void Fuzzer::ReadAndExecuteSeedCorpora_FSM(Vector<SizedFile> &CorporaFiles) {
 
   if (CorporaFiles.empty()) {
     Printf("INFO: A corpus is not provided, starting from a state\n");
-    // Unit U({'\n'}); // Valid ASCII input.  
     // note: get one state and access sequence, as initial corpus
     Unit U;
     State initial_s=choose_state();
     cur_state=initial_s;
-    Printf("cur state, role=%d, state=%d, asso_model=%d\n", 
-    cur_state.state[0],  cur_state.state[1],  cur_state.state[2]);
     std::vector<uint8_t> initial_m1=get_access_sequence(cur_state);
     for (int i=0; i<initial_m1.size(); i++)
       U.push_back(initial_m1[i]);
     U.push_back(1);
     RunOne(U.data(), U.size());     // run initial corpus
+
+    // Printf("INFO: A corpus is not provided, starting from an empty corpus\n");
+    // Unit U({'\n'}); // Valid ASCII input.
+    // RunOne(U.data(), U.size());     //*
   } else {
     Printf("INFO: seed corpus: files: %zd min: %zdb max: %zdb total: %zdb"
            " rss: %zdMb\n",
@@ -1229,7 +1187,7 @@ void Fuzzer::Loop(Vector<SizedFile> &CorporaFiles) {
 }
 
 void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
-  // Printf("ENTER LOOP_FSM 1123\n");
+  // Printf("ENTER LOOP_FSM 1191\n");
   auto FocusFunctionOrAuto = Options.FocusFunction;
   DFT.Init(Options.DataFlowTrace, &FocusFunctionOrAuto, CorporaFiles,
            MD.GetRand());
@@ -1266,9 +1224,7 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
           Printf("choose a new state...\n");
           cur_state=choose_state();
           new_choose_state=true;
-          Printf("new state, role=%d, smp_cb state=%d, asso_model=%d\n", 
-          cur_state.state[0], cur_state.state[1], cur_state.state[2]);
-          std::vector<uint8_t> m1=get_access_sequence(cur_state);  // TBD: where to generate and use m1 ?
+          std::vector<uint8_t> m1=get_access_sequence(cur_state);  //
           Unit U;
           for (int i=0; i<m1.size(); i++)
             U.push_back(m1[i]);

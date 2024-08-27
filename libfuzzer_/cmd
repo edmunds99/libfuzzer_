@@ -19,4 +19,4 @@ cmake --build build --target install
 
 [replace libfuzzer.a]
 
-cp /scratch/wjw5351/opt/llvm-13/lib/clang/13.0.1/lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer.a /scratch/wjw5351/aosp/prebuilts/clang/host/linux-x86/clang-r498229b/lib/clang/17/lib/x86_64-unknown-linux-gnu  
+cp /scratch/wjw5351/opt/llvm-13/lib/clang/13.0.1/lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer.a /scratch/wjw5351/aosp/prebuilts/clang/host/linux-x86/clang-r498229b/lib/clang/17/lib/x86_64-unknown-linux-gnu

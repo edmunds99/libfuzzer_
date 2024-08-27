@@ -1,8 +1,9 @@
-
 #include <iostream>
 #include <vector>
 #include <map>
 #include <cstdint>
+#include <fstream>
+#include <iomanip> // For std::hex and std::setw
 
 class State {
 public:
@@ -37,14 +38,10 @@ public:
 
 	std::vector<State> states;
 	std::map<std::pair<State, State>, Packet, StatePairComp> transitions;
-	std::map<State, PacketList> stateToPacketsMap;
+	std::map<State, PacketList> StateToPackets;
+	std::map<int, std::vector<uint8_t>> AccSeq;   // key is state id
 
 	// some fake values, for manual create M1
-	std::vector<uint8_t> fake_confirm;
-	std::vector<uint8_t> fake_rand;
-	std::vector<uint8_t> fake_pub_key;
-	std::vector<uint8_t> fake_dhkey_check;
-	std::vector<uint8_t> asso_model_pair[10][2];   // 9 association models with pair_req/rsp
 	uint32_t fixed_eccx[8] = {2198633781, 2475574431, 2735915610, 1722828383, 3606873419, 2458771352, 2385206393, 1720691774};
 	uint32_t fixed_eccy[8] = {2556214130, 2565982928, 3359245577, 1000677376, 3540911383, 3871339133, 422803352, 122696205};
 	uint8_t fixed_ecc32x[32]={0};
@@ -75,81 +72,75 @@ public:
 		}
 	}
 
-	void initialize_fake_value() {
-		// for (int i=0; i<9; i++) {
-		// 	asso_model_pair[i][0].resize(7,0); asso_model_pair[i][0][0]=1;
-		// 	asso_model_pair[i][1].resize(7,0); asso_model_pair[i][0][0]=2;
-		// }
-		// cmd, io_cap, oob_flag, auth_req, enc_size, ik, rk. 
-		// auth_req: bf:2, mitm:1, sc:1, kp:1, reserved:3  0xc0 -> 0x1100000 (bf set)
-		asso_model_pair[0][0]={0, 0, 0xc0, 8, 0, 0};
-		asso_model_pair[0][1]={7, 2, 0, 0, 0xc0, 8, 0, 0};
-		asso_model_pair[1][0]={4, 0, 0xc0|(4), 8, 0, 0};
-		asso_model_pair[1][1]={7, 2, 1, 0, 0xc0|(4), 8, 0, 0};
-		asso_model_pair[2][0]={0, 1, 0xc0, 8, 0, 0};
-		asso_model_pair[2][1]={7, 2, 0, 1, 0xc0, 8, 0, 0};
-		asso_model_pair[3][0]={1, 0, 0xc0|(4), 8, 0, 0};
-		asso_model_pair[3][1]={7, 2, 4, 0, 0xc0|(4), 8, 0, 0};
-		asso_model_pair[4][0]={0, 0, 0xc0|(8), 8, 0, 0};
-		asso_model_pair[4][1]={7, 2, 0, 0, 0xc0|(8), 8, 0, 0};
-		asso_model_pair[5][0]={1, 0, 0xc0|(4)|(8), 8, 0, 0};
-		asso_model_pair[5][1]={7, 2, 1, 0, 0xc0|(4)|(8), 8, 0, 0};
-		asso_model_pair[6][0]={2, 0, 0xc0|(4)|(8), 8, 0, 0};
-		asso_model_pair[6][1]={7, 2, 0, 0, 0xc0|(4)|(8), 8, 0, 0};
-		asso_model_pair[7][0]={0, 0, 0xc0|(4)|(8), 8, 0, 0};
-		asso_model_pair[7][1]={7, 2, 2, 0, 0xc0|(4)|(8), 8, 0, 0};
-		asso_model_pair[8][0]={0, 1, 0xc0, 8, 0, 0};
-		asso_model_pair[8][1]={7, 2, 0, 1, 0xc0, 8, 0, 0};
+	void parseAccSeq(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open file: " << filepath << std::endl;
+            return;
+        }
 
-		fake_confirm.resize(18,0); fake_confirm[0]=17; fake_confirm[1]=3;
-		fake_rand.resize(18,0); fake_rand[0]=17; fake_rand[1]=4;
+        std::string line;
+        int stateId;
+        std::vector<int> stateVars;
+        std::vector<uint8_t> packetData;
 
-		fake_pub_key.resize(66,0); fake_pub_key[0]=65; fake_pub_key[1]=12;
-		memcpy(fixed_ecc32x, fixed_eccx, 32);
-      	memcpy(fixed_ecc32y, fixed_eccy, 32);
-		for (int i=2; i<=33; i++) fake_pub_key[i]=fixed_ecc32x[i-2];
-      	for (int i=34; i<=65; i++) fake_pub_key[i]=fixed_ecc32y[i-34];
-		
-		fake_dhkey_check.resize(18,0); fake_dhkey_check[0]=17; fake_dhkey_check[1]=13;
-	}
+        while (getline(file, line)) {
+            if (line.empty()) continue;   // Skip empty lines
 
-	// State s:  role(0:central, 1:peripheral), state, asso_model
-	void CreateManualAccessSeq(State s) {
-		if (s.state[0]==0 && s.state[1]==5) {
-			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1]};
+            std::istringstream iss(line);
+            iss >> stateId;  // Read state ID from the first line
+
+            // Read the second line as state variables
+            if (getline(file, line)) {
+                iss.str(line);
+                iss.clear();
+                stateVars.clear();
+
+                int var;
+                while (iss >> var) {
+                    stateVars.push_back(var);
+                }
+
+                states.push_back(State(stateVars, stateId));  // Store the state
+            }
+
+            // Read the third line as packet data
+            if (getline(file, line)) {
+                iss.str(line);
+                iss.clear();
+                packetData.clear();
+
+                int byte;
+				if (stateVars[1]==3) packetData.push_back(1);  // flag for initial state
+				else packetData.push_back(2);  // flag for regular state
+                while (iss >> byte) {
+                    packetData.push_back(static_cast<uint8_t>(byte));
+                }
+
+                AccSeq[stateId] = packetData;  // Update the map with the new state and its packet data
+            }
+        }
+
+        file.close();
+    }
+
+	void printAccSeq() {
+		for (size_t i=0; i<states.size(); i++) {
+			std::cout << "state id:" << states[i].id<<std::endl;
+			std::cout << "state"<<' ';
+			for (size_t j=0; j<states[i].state.size(); j++)
+				std::cout << states[i].state[j] << ' ';
+			std::cout << std::endl;
+			std::cout << "acc seq:"<<std::endl;
+			for (size_t j=0; j<AccSeq[states[i].id].size(); j++)
+				std::cout <<static_cast<int>(AccSeq[states[i].id][j]) <<' ';
+			std::cout<<std::endl;
+			std::cout<<std::endl;
 		}
-		// std::cout<<"enter fsm_new 122"<<std::endl;
-		// for (int i=0; i<asso_model_pair[s.state[2]][0].size(); i++)
-		// 	std::cout<<asso_model_pair[s.state[2]][0][i]<<' ';
-		if (s.state[0]==0 && s.state[1]==6) {
-			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1], fake_confirm};
-		}
-		if (s.state[0]==0 && s.state[1]==7) {
-			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1]};
-		}
-		if (s.state[0]==0 && s.state[1]==9) {
-			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1], fake_pub_key};
-		}
-		if (s.state[0]==0 && s.state[1]==10) {
-			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm};
-		}
-		if (s.state[0]==0 && s.state[1]==12) {
-			stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-			asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm, fake_rand};
-		}
-		if (s.state[0]==0 && s.state[1]==14) {
-			if (s.state[2]<=3) // <=3, legacy
-				stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-				asso_model_pair[s.state[2]][1], fake_confirm, fake_rand};
-			else // >=4, sc
-				stateToPacketsMap[s]={{0, 1, 0}, asso_model_pair[s.state[2]][0],
-				asso_model_pair[s.state[2]][1], fake_pub_key, fake_confirm, fake_rand, fake_dhkey_check};
-		}
+    }
+
+	void parseFSM(std::string filepath) {
+
 	}
 };
 
@@ -197,8 +188,8 @@ public:
 //         {0x04, 0x05, 0x06}
 //     };
 
-//     fsm.stateToPacketsMap[s1] = packets;
-//     for (const auto& pair : fsm.stateToPacketsMap) {
+//     fsm.accSeq[s1] = packets;
+//     for (const auto& pair : fsm.accSeq) {
 //         std::cout << "State ID: " << pair.first.id << std::endl;
 //         for (const auto& packet : pair.second) {
 //             std::cout << "Packet: ";
