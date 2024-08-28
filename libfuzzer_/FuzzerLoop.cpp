@@ -58,7 +58,6 @@ int state_exec_times[max_state_num+5];
 bool state_executed[max_state_num+5];
 bool all_state_executed=false;
 State cur_state;
-extern State real_state;
 
 bool new_choose_state;     
 // must add to state corpus for newly chosen state (even if cov no increase)
@@ -956,20 +955,27 @@ void Fuzzer::initialize_FSM() {
 }
 
 void Fuzzer::valid_check() {
+  Printf("start valid check of state and acc seq\n");
   doing_valid_check=true;
   for (int i=0; i<fsm.states.size(); i++) {
     State expected_state=fsm.states[i];
     Unit U;
-    std::vector<uint8_t> m1=get_access_sequence(cur_state);
+    std::vector<uint8_t> m1=get_access_sequence(expected_state);
     for (int i=0; i<m1.size(); i++)
       U.push_back(m1[i]);
     RunOne(U.data(), U.size()); 
 
     // currently check 4 state variables
-    for (int i=0; i<4; i++) {
-      if (expected_state.state[i]!=real_state.state[i])
+    bool valid=true;
+    for (int j=0; j<4; j++) {
+      if (expected_state.state[j]!=real_state.state[j]) {
         Printf("valid check for state %d fails\n", fsm.states[i].id);
+        valid=false;
+        break;
+      }
     }
+    if (valid)
+      Printf("valid check for state %d succeeds\n",fsm.states[i].id);
   }
   doing_valid_check=false;
 }

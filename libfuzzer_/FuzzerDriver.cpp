@@ -810,7 +810,10 @@ int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
   auto *MD = new MutationDispatcher(Rand, Options);
   auto *Corpus = new InputCorpus(Options.OutputCorpus, Entropic);
   auto *F = new Fuzzer(Callback, *Corpus, *MD, Options);
-  F->initialize_FSM();       // initialize FSM
+
+  // initialize FSM and valid check
+  F->initialize_FSM();       
+  F->valid_check();
 
   for (auto &U: Dictionary)
     if (U.size() <= Word::GetMaxSize())
