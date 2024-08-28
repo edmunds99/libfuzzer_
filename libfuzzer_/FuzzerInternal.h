@@ -111,6 +111,7 @@ private:
   int find_sep_pos(const Unit &U);
   State choose_state();
   bool check_all_executed();
+  void valid_check();
   std::vector<uint8_t> get_access_sequence(State s);
 
   void PurgeAllocator();

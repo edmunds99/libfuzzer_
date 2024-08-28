@@ -36,6 +36,9 @@
 #endif
 #endif
 
+extern bool doing_valid_check;
+extern State real_state;
+
 namespace fuzzer {
 static const size_t kMaxUnitSizeToPrint = 256;
 
@@ -45,7 +48,7 @@ bool RunningUserCallback = false;
 
 // const int max_state_num=100;   // defined in FuzzerDefs.h
 const int max_state_exec=10000;
-int state_cov_interval=10;
+int state_cov_interval=100;       // 100 sec
 size_t last_cov=0;
 size_t cur_cov;
 system_clock::time_point last_cov_upd;
@@ -55,6 +58,7 @@ int state_exec_times[max_state_num+5];
 bool state_executed[max_state_num+5];
 bool all_state_executed=false;
 State cur_state;
+extern State real_state;
 
 bool new_choose_state;     
 // must add to state corpus for newly chosen state (even if cov no increase)
@@ -541,6 +545,10 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   assert(Size < std::numeric_limits<uint32_t>::max());
 
   ExecuteCallback(Data, Size);      // note: execute (self defined) Fuzz
+
+  if (doing_valid_check)            // valid check
+    return true;
+
   state_exec_times[cur_state.id]++; 
   auto TimeOfUnit = duration_cast<microseconds>(UnitStopTime - UnitStartTime);
 
@@ -569,7 +577,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
   PrintPulseAndReportSlowInput(Data, Size);
   size_t NumNewFeatures = Corpus.NumFeatureUpdates() - NumUpdatesBefore;
 
-  if ((NumNewFeatures || ForceAddToCorpus) || new_choose_state) {  // add to corpus when new state chosen (and state corpus empty)
+  if ((NumNewFeatures || ForceAddToCorpus) || new_choose_state) {  // new_choose_state: add to corpus when new state chosen (because state corpus empty)
     // Printf("NumNewFeatures 569\n");
     TPC.UpdateObservedPCs();
     auto NewII =
@@ -947,10 +955,32 @@ void Fuzzer::initialize_FSM() {
 
 }
 
+void Fuzzer::valid_check() {
+  doing_valid_check=true;
+  for (int i=0; i<fsm.states.size(); i++) {
+    State expected_state=fsm.states[i];
+    Unit U;
+    std::vector<uint8_t> m1=get_access_sequence(cur_state);
+    for (int i=0; i<m1.size(); i++)
+      U.push_back(m1[i]);
+    RunOne(U.data(), U.size()); 
+
+    // currently check 4 state variables
+    for (int i=0; i<4; i++) {
+      if (expected_state.state[i]!=real_state.state[i])
+        Printf("valid check for state %d fails\n", fsm.states[i].id);
+    }
+  }
+  doing_valid_check=false;
+}
+
 bool Fuzzer::check_all_executed() {
-  for (int i=0; i<=fsm.states.size(); i++) {
-    if (state_executed[fsm.states[i].id]==false) 
+  Printf("fsm.states.size()=%d\n", fsm.states.size());
+  for (int i=0; i<fsm.states.size(); i++) {
+    if (state_executed[fsm.states[i].id]==false) {
+      Printf("state %d not executed\n", fsm.states[i].id);
       return false;
+    }
   }
   all_state_executed=true;
   return true;
@@ -1223,6 +1253,7 @@ void Fuzzer::Loop_FSM(Vector<SizedFile> &CorporaFiles) {
         if (!all_state_executed) {
           Printf("choose a new state...\n");
           cur_state=choose_state();
+          Printf("cur state id=%d\n", cur_state.id);
           new_choose_state=true;
           std::vector<uint8_t> m1=get_access_sequence(cur_state);  //
           Unit U;

@@ -3,7 +3,6 @@
 #include <map>
 #include <cstdint>
 #include <fstream>
-#include <iomanip> // For std::hex and std::setw
 
 class State {
 public:
